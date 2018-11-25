@@ -1,56 +1,72 @@
 package fr.android.androidexercises
 
 import android.os.Bundle
+import android.os.PersistableBundle
+import android.support.v4.app.Fragment
 import android.support.v7.app.AppCompatActivity
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.GET
-import timber.log.Timber
+import fr.android.androidexercises.fragments.FragmentDetails
+import fr.android.androidexercises.fragments.FragmentList
 
-class LibraryActivity : AppCompatActivity() {
+class LibraryActivity : AppCompatActivity(), FragmentList.Listener, FragmentDetails.ListenerDetails {
 
+    private var currentDetailsFragment: Fragment? = null
 
+    override fun onBookSelected(book: Book) {
+        val detailsFragment = FragmentDetails.newInstance(book, resources.configuration.orientation == 2)
+        currentDetailsFragment = detailsFragment
+        if(resources.configuration.orientation == 1) {
+            supportFragmentManager.beginTransaction()
+                    .replace(R.id.list_fragment, detailsFragment, FragmentDetails::class.java.name).addToBackStack("list_fragment")
+                    .commit()
+        }else{
+            supportFragmentManager.beginTransaction()
+                    .replace(R.id.details_fragment, detailsFragment, FragmentDetails::class.java.name).addToBackStack("details_fragment")
+                    .commit()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_library)
 
-        // Plant logger cf. Android Timber
-        // Timber.plant(new Timber.DebugTree());
-        Timber.plant(Timber.DebugTree())
+        supportFragmentManager.beginTransaction()
+                .replace(R.id.list_fragment, FragmentList(), FragmentList::class.java.name)
+                .commit()
+        if(resources.configuration.orientation == 2){
+            supportFragmentManager.beginTransaction()
+                    .replace(R.id.details_fragment, FragmentDetails(), FragmentDetails::class.java.name).addToBackStack("details_fragment")
+                    .commit()
+        }else{
+            //Not working
+            supportFragmentManager.beginTransaction()
+                    .remove(FragmentDetails()).addToBackStack(null)
+                    .commit()
+        }
+    }
 
-        // TODO build Retrofit
-        val retrofit = Retrofit.Builder()
-                .baseUrl("http://henri-potier.xebia.fr/")
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-        // TODO create a service
-        val api = retrofit.create(HenriPotierService.Api::class.java)
-        // TODO listBooks()
-        api.listBooks()
-        // TODO enqueue call and display book title
-        api.listBooks().enqueue(object : Callback<Array<Book>> {
-            override fun onFailure(call: Call<Array<Book>>, t: Throwable) {
-                Timber.e(t)
-            }
+    override fun onCloseFragment() {
+        supportFragmentManager.popBackStack()
+        supportFragmentManager.beginTransaction()
+                .replace(R.id.list_fragment, FragmentList(), FragmentList::class.java.name).addToBackStack("list_fragment")
+                .commit()
+    }
 
-            override fun onResponse(call: Call<Array<Book>>,
-                                    response: Response<Array<Book>>) {
-                if (response.isSuccessful) {
-                    Timber.i("Success")
-                    response.body()?.forEach {
-                        Timber.i("Book " + it.title)
-                    }
-                }
-            }
-        })
+    override fun onSaveInstanceState(outState: Bundle?, outPersistentState: PersistableBundle?) {
+        super.onSaveInstanceState(outState, outPersistentState)
+        if(currentDetailsFragment != null) {
+            supportFragmentManager.putFragment(outState!!, "savedDetailFragment", currentDetailsFragment!!)
+        }
+    }
 
-        // TODO log books
+    override fun onRestoreInstanceState(savedInstanceState: Bundle?) {
+        super.onRestoreInstanceState(savedInstanceState)
 
-        // TODO display book as a list
+        val frag = supportFragmentManager.getFragment(savedInstanceState!!, "savedDetailFragment")
+        if(frag != null){
+            supportFragmentManager.beginTransaction()
+                    .replace(R.id.details_fragment, frag, FragmentDetails::class.java.name).addToBackStack("details_fragment")
+                    .commit()
+        }
     }
 
 }
